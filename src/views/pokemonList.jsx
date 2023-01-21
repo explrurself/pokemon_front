@@ -263,6 +263,7 @@ export default class Pokemon extends Component {
                       }}
                     >
                       Name: {item.name}
+                      <br />
                       HP: {item.hp}
                     </div>
                     <div>
