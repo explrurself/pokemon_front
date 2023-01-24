@@ -2,6 +2,10 @@ import axios from "axios";
 import React, { Component } from "react";
 import InfiniteScroll from "react-infinite-scroll-component";
 import init from "../helpers/windowToken";
+import Cookies from "js-cookie";
+import { instanceOf } from "prop-types";
+
+axios.defaults.withCredentials = true;
 
 export default class Pokemon extends Component {
   state = {
@@ -17,9 +21,28 @@ export default class Pokemon extends Component {
     inputType: "password",
     notification: false,
     name: "",
+    list_load: false,
   };
   componentDidMount() {
+    // console.log(Cookies.get('token'));
     this.getData();
+    window.addEventListener("scroll", () => {
+      console.log(window.scrollY); //scrolled from top
+      console.log(window.innerHeight); //visible part of screen
+      if (
+        window.scrollY + window.innerHeight >=
+        document.documentElement.scrollHeight
+      ) {
+        this.setState(
+          {
+            list_load: true,
+          },
+          () => {
+            this.nextpage();
+          }
+        );
+      }
+    });
   }
   getData = () => {
     if (init() === "success") {
@@ -27,24 +50,30 @@ export default class Pokemon extends Component {
       axios
         .get("http://localhost:2000/api/pokemon", {
           headers: {
-            Authorization: localStorage.getItem["Authorization"],
+            Authorization: Cookies.get("token"),
           },
         })
         .then((resp) => {
           if (resp.data.status === "success") {
-            this.setState(
-              {
-                pokemon_list: resp.data.data.docs,
-                nextpage: resp.data.data.hasNextPage,
-                page: resp.data.data.page,
-              },
-              () => {
-                console.log(this.state.pokemon_list);
-              }
-            );
+            this.setState({
+              pokemon_list: resp.data.data.docs,
+              nextpage: resp.data.data.hasNextPage,
+              page: resp.data.data.page,
+              list_load: false,
+            });
           } else {
             this.setState({
+              login_status: false,
               message: resp.data.message,
+            });
+          }
+        })
+        .catch((err) => {
+          // console.log(err)
+          if (err.response.data.status === 500) {
+            this.setState({
+              login_status: false,
+              message: err.response.data.message,
             });
           }
         });
@@ -61,11 +90,13 @@ export default class Pokemon extends Component {
       password: this.state.password,
     };
     axios
-      .post("http://localhost:2000/api/users/login", payload)
+      .post("http://localhost:2000/api/users/login", payload, {
+        withCredentials: true,
+      })
       .then((resp) => {
-        // console.log(resp);
         if (resp.data.status === "success") {
           localStorage.setItem("accessToken", resp.data.token);
+
           this.setState({
             name: resp.data.name,
             login_status: true,
@@ -93,6 +124,7 @@ export default class Pokemon extends Component {
   };
   logout = () => {
     localStorage.setItem("accessToken", "");
+    Cookies.remove("token");
     window.location.reload();
   };
   showPass = () => {
@@ -113,12 +145,11 @@ export default class Pokemon extends Component {
         }&pageSize=8`,
         {
           headers: {
-            Authorization: localStorage.getItem["Authorization"],
+            Authorization: Cookies.get("token"),
           },
         }
       )
       .then((resp) => {
-        console.log(resp);
         if (resp.data.status === "success") {
           resp.data.data.docs.map((item) => {
             this.state.pokemon_list.push(item);
@@ -212,7 +243,73 @@ export default class Pokemon extends Component {
           </div>
         ) : (
           <div>
-            <InfiniteScroll
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "25% 25% 25% 25%",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {this.state.pokemon_list.map((item, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    backgroundColor: "#DDDDDD",
+                    height: "400px",
+                    width: "300px",
+                    margin: "25px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexDirection: "column",
+                    borderRadius: "15px",
+                  }}
+                >
+                  <img
+                    src={item.images_url}
+                    alt=""
+                    style={{
+                      height: "250px",
+                      width: "200px",
+                      marginTop: "10px",
+                    }}
+                  />
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    Name: {item.name}
+                    <br />
+                    HP: {item.hp}
+                  </div>
+                  <div>
+                    ATTACKS: {item.attacks.map((att) => att).join(", ")} <br />
+                    ABILITY:{" "}
+                    {item.abilities.length > 0
+                      ? item.abilities.map((abelity) => abelity).join(", ")
+                      : "NA"}
+                  </div>
+
+                  {this.state.list_load === true && (
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                      }}
+                    >
+                      Please wait pokeball is coming out...
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* <InfiniteScroll
               dataLength={this.state.pokemon_list.length}
               next={this.nextpage}
               hasMore={this.state.nextpage}
@@ -277,7 +374,7 @@ export default class Pokemon extends Component {
                   </div>
                 ))}
               </div>
-            </InfiniteScroll>
+            </InfiniteScroll> */}
           </div>
         )}
       </div>
